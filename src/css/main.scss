@@ -1,0 +1,17 @@
+@charset "utf-8";
+
+@import "../../node_modules/bulma/bulma.sass";
+
+
+.field.dropdown-item{
+    padding: 0px;
+    margin-bottom: 0px;
+}
+
+.field.dropdown-item input{
+    border: none;
+    border-radius: 0px;
+    box-shadow: none;
+    margin-bottom: 0px;
+}
+
