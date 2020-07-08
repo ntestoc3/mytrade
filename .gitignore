@@ -4,3 +4,4 @@ target/
 public/js/
 .shadow-cljs/
 .nrepl-port
+*.lock

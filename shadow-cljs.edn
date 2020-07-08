@@ -4,6 +4,11 @@
                 [reagent "0.10.0"]
                 [reagent-utils "0.3.3"]
                 [cljs-ajax "0.8.0"]
+                [com.andrewmcveigh/cljs-time "0.5.2"]
+                [com.taoensso/timbre "4.10.0"]
+                [mount "0.1.16"]
+                [org.clojure/core.async "1.2.603"]
+                [datascript "0.18.13"]
                 [binaryage/oops "0.7.0"]
                 [metosin/reitit "0.5.1"]
                 [venantius/accountant "0.2.5"
@@ -24,4 +29,6 @@
             :modules {:app {:init-fn mytrade.core/init}}
             :devtools {:preloads [shadow.remote.runtime.cljs.browser]}
             :build-hooks [(hooks.sass/watch)]
+            :compiler-options {:infer-externs :auto
+                               :externs ["datascript/externs.js"]} 
             }}}
