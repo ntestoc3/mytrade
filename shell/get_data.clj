@@ -53,7 +53,7 @@
              (prn "query code:" code)
              (let [info (get-info code)]
                (when (and info
-                          (not-empty {:fund_minsg r3}))
+                          (not-empty {:fund_minsg info}))
                  (->> (select-keys info [:Data_ACWorthTrend :Data_grandTotal])
                       (json/encode)
                       (spit (str "datas/" code ".json")))
