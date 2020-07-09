@@ -44,6 +44,14 @@
            (into {})))))
 
 
+(defn get-fund-data
+  [code]
+  (let [url (format "http://fund.eastmoney.com/%s.html" code)
+        resp (curl/get url {:throw false})]
+    (when (= 200 (:status resp))
+      (:body resp))
+    ))
+
 (-> (clojure.java.io/file "datas")
     (.mkdir))
 
