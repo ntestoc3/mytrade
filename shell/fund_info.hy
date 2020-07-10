@@ -100,14 +100,16 @@
   (setv code (of fund 0))
   (logging.info "save-fund-info: %s" code)
   (setv info (get-fund-history-info code))
-  (when (and info
+  (if (and info
              (.get info "fund_minsg"))
-    (setv info (select-keys info ["Data_ACWorthTrend" "Data_grandTotal"]))
-    (->> (get-manager-info code)
-         (assoc info "managers"))
-    (save-data f"{code}.json" info)
-    (logging.info "save-fund-info: %s, ok!" code)
-    fund))
+      (do
+        (setv info (select-keys info ["Data_ACWorthTrend" "Data_grandTotal"]))
+        (->> (get-manager-info code)
+             (assoc info "managers"))
+        (save-data f"{code}.json" info)
+        (logging.info "save-fund-info: %s, ok!" code)
+        fund)
+      (logging.warning "save-fund-info: %s, skipped!" code)))
 
 (setv data-dir "datas/")
 
@@ -123,6 +125,8 @@
         (save-data "all_funds.json")))
 
 (defmain [&rest args]
-  (logging.basicConfig :level logging.INFO)
+  (logging.basicConfig :level logging.INFO
+                       :style "{"
+                       :format "{asctime} [{levelname}] {filename}({funcName})[{lineno}] {message}")
   (save-all-info)
   (logging.info "over!"))
