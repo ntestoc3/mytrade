@@ -50,6 +50,7 @@
         resp (curl/get url {:throw false})]
     (when (= 200 (:status resp))
       (:body resp))
+    ;; 需要解析html,bb库有点麻烦
     ))
 
 (-> (clojure.java.io/file "datas")
