@@ -7,4 +7,4 @@ __pycache__
 .nrepl-port
 .cpcache
 *.lock
-*.json
+shell/datas/
