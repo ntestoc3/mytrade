@@ -1,0 +1,10 @@
+version: '2'
+services:
+  stockapi:
+    image: nginx
+    volumes:
+      - ./conf.d:/etc/nginx/conf.d
+      - ./datas:/data/www
+    ports:
+      - "6688:80"
+

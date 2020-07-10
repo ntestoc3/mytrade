@@ -109,7 +109,7 @@
         (save-data f"{code}.json" info)
         (logging.info "save-fund-info: %s, ok!" code)
         fund)
-      (logging.warning "save-fund-info: %s, skipped!" code)))
+      (logging.info "save-fund-info: %s, skipped!" code)))
 
 (setv data-dir "datas/")
 
@@ -126,6 +126,8 @@
 
 (defmain [&rest args]
   (logging.basicConfig :level logging.INFO
+                       :filename "app.log"
+                       :filemode "w"
                        :style "{"
                        :format "{asctime} [{levelname}] {filename}({funcName})[{lineno}] {message}")
   (save-all-info)
