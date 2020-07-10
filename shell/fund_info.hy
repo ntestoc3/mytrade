@@ -4,12 +4,12 @@
 (import requests)
 (import json)
 (import re)
-(import [datetime [datetime]])
 (import os)
 ;; 对于I/O操作,使用线程池可以降低cpu和内存占用
 ;; 去掉.dummy就使用多进程
 (import [multiprocessing.dummy [Pool]])
 (import logging)
+(import [datetime [datetime]])
 
 (defmacro ->2> [head &rest args]
   "Thread macro for second arg"
@@ -19,6 +19,25 @@
                   `(~(first node) ~(second node) ~ret ~@(drop 2 node))
                   `(~node ~ret))))
   ret)
+
+(defn select-keys
+  [d ks]
+  (->> (.items d)
+       (filter #%(-> (first %1)
+                     (in ks)))
+       dict))
+
+(defn pmap
+  [f datas &optional [proc 5]]
+  ":proc 为进程数量"
+  (with [pool (Pool :processes proc)]
+    (pool.map f datas)))
+
+(defn curr-times
+  []
+  "当前时间字符串"
+  (-> (.now datetime)
+      (.strftime "%Y%m%d%H%M%S")))
 
 (defn get-all-funds
   []
@@ -31,12 +50,6 @@
       (.replace "," " ")
       read-str
       eval))
-
-(defn curr-times
-  []
-  "当前时间字符串"
-  (-> (.now datetime)
-      (.strftime "%Y%m%d%H%M%S")))
 
 (defn get-fund-history-info
   [code]
@@ -52,27 +65,23 @@
                  (-> (second x)
                      (.replace "'" "\"")
                      (json.loads))]))
-         list
          dict)))
-
 
 (defn parse-manager-info
   [data]
   "解析基金经理变动信息"
-  (-> (.find data "li" :id "fundManagerTab")
-      (. table)
+  (-> (.select-one data "li#fundManagerTab table")
       (.find-all "tr")
       (->> rest
-           (ap-map (->> (zip ["work-range" "name" "days" "percent"]
-                             [(-> (.find it "td" :class_ "td01")
-                                  (. text))
-                              (-> (.find it "td" :class_ "td02")
-                                  (. a text))
-                              (-> (.find it "td" :class_ "td03")
-                                  (. text))
-                              (-> (.find it "td" :class_ "td04")
-                                  (. text))
-                              ])
+           (map #%(->> (zip ["work-range" "name" "days" "percent"]
+                             [(-> (.select-one %1 "td.td01")
+                                  (.get-text))
+                              (-> (.select-one %1 "td.td02 a")
+                                  (.get-text))
+                              (-> (.select-one %1 "td.td03")
+                                  (.get-text))
+                              (-> (.select-one %1 "td.td04")
+                                  (.get-text))])
                         (dict)))
            list)))
 
@@ -83,13 +92,6 @@
       (. text)
       (BeautifulSoup "lxml")
       parse-manager-info))
-
-(defn select-keys
-  [d ks]
-  (->> (.items d)
-       (filter #%(-> (first %1)
-                     (in ks)))
-       dict))
 
 (defn save-data
   [fname data]
@@ -112,12 +114,6 @@
     fund))
 
 (setv data-dir "datas/")
-
-(defn pmap
-  [f datas &optional [proc 5]]
-  ":proc 为进程数量"
-  (with [pool (Pool :processes proc)]
-    (pool.map f datas)))
 
 (defn save-all-info
   []
