@@ -6,7 +6,9 @@
 (import re)
 (import [datetime [datetime]])
 (import os)
-(import [multiprocessing [Pool]])
+;; 对于I/O操作,使用线程池可以降低cpu和内存占用
+;; 去掉.dummy就使用多进程
+(import [multiprocessing.dummy [Pool]])
 (import logging)
 
 (defmacro ->2> [head &rest args]
@@ -61,7 +63,7 @@
       (. table)
       (.find-all "tr")
       (->> rest
-           (ap-map (->> (zip ["range" "name" "days" "percent"]
+           (ap-map (->> (zip ["work-range" "name" "days" "percent"]
                              [(-> (.find it "td" :class_ "td01")
                                   (. text))
                               (-> (.find it "td" :class_ "td02")
@@ -102,8 +104,11 @@
   (setv info (get-fund-history-info code))
   (when (and info
              (.get info "fund_minsg"))
-    (->> (select-keys info ["Data_ACWorthTrend" "Data_grandTotal"])
-         (save-data f"{code}.json"))
+    (setv info (select-keys info ["Data_ACWorthTrend" "Data_grandTotal"]))
+    (->> (get-manager-info code)
+         (assoc info "managers"))
+    (save-data f"{code}.json" info)
+    (logging.info "save-fund-info: %s, ok!" code)
     fund))
 
 (setv data-dir "datas/")
@@ -120,12 +125,12 @@
   (->2> (get-all-funds)
         (filter #%(-> (of %1 3)
                       (in #{"股票型" "混合型"})))
-        (take 30)
-        (pmap save-fund-info :proc 20)
+        (pmap save-fund-info :proc 8)
         (filter identity)
         list
         (save-data "all_funds.json")))
 
 (defmain [&rest args]
   (logging.basicConfig :level logging.INFO)
-  (save-all-info))
+  (save-all-info)
+  (logging.info "over!"))
