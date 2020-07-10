@@ -2,6 +2,9 @@ build/
 node_modules/
 target/
 public/js/
+__pycache__
 .shadow-cljs/
 .nrepl-port
+.cpcache
 *.lock
+*.json
