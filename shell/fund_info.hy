@@ -58,32 +58,28 @@
   (setv data (requests.get f"http://fund.eastmoney.com/pingzhongdata/{code}.js?v={t}"))
   (when (= 200 data.status-code)
     (setattr data "encoding" "gbk2312")
-    (->> data.text
-         (re.findall r"var (\w+)\s*=\s*([\[\"].*?[\]\"])\s*;")
-         (map (fn [x]
-                [(first x)
-                 (-> (second x)
-                     (.replace "'" "\"")
-                     (json.loads))]))
-         dict)))
+    (->2> data.text
+          (re.findall r"var (\w+)\s*=\s*([\[\"].*?[\]\"])\s*;")
+          (lfor [k v] [k
+                       (-> (.replace v "'" "\"")
+                           (json.loads))])
+          dict)))
+
+(defn select-table-text
+  [table]
+  (lfor r (.select table "tr")
+        (lfor c (.select r "td")
+              (.get-text c " " :strip True))))
 
 (defn parse-manager-info
   [data]
   "解析基金经理变动信息"
   (-> (.select-one data "li#fundManagerTab table")
-      (.find-all "tr")
-      (->> rest
-           (map #%(->> (zip ["work-range" "name" "days" "percent"]
-                             [(-> (.select-one %1 "td.td01")
-                                  (.get-text))
-                              (-> (.select-one %1 "td.td02 a")
-                                  (.get-text))
-                              (-> (.select-one %1 "td.td03")
-                                  (.get-text))
-                              (-> (.select-one %1 "td.td04")
-                                  (.get-text))])
-                        (dict)))
-           list)))
+      (select-table-text)
+      rest
+      (->2> (lfor row
+                  (-> (zip ["work-range" "name" "days" "percent"] row)
+                      (dict))))))
 
 (defn get-manager-info
   [code]
