@@ -1,8 +1,8 @@
 (ns mytrade.api
   (:require [ajax.core :refer [GET POST]]
-            [mytrade.db :as db]
             [cljs-time.core :as time]
             [cljs.core.async :as async :refer [go <!]]
+            [com.wsscode.async.async-cljs :refer [go-promise <?]]
             [goog.string :as gstring]
             [cljs-time.format :as timef]
             [taoensso.timbre :as timbre
@@ -19,14 +19,20 @@
     (GET (str api-server "/all_funds.json")
         {:response-format :json
          :keywords? true
-         :handler #(async/put! %1)})
+         :error-handler (fn [err]
+                          (error err)
+                          (async/put! result err))
+         :handler #(async/put! result %1)})
     result))
 
-(defn get-fund-history
+(defn get-fund-info
   [code]
   (let [result (async/promise-chan)]
     (GET (str api-server "/" code ".json")
         {:response-format :json
          :keywords? true
-         :handler #(async/put! %1)})
+         :error-handler (fn [err]
+                          (error err)
+                          (async/put! result err))
+         :handler #(async/put! result %1)})
     result))
