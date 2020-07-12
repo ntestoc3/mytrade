@@ -4,11 +4,19 @@
    [reagent.dom :as rdom]
    [reagent.session :as session]
    [cljs.core.async :as async :refer [go <!]]
+   [com.wsscode.async.async-cljs :as wa :refer [go-promise <? <?maybe]]
    [reitit.frontend :as reitit]
    [mytrade.charts :refer [stock]]
+   [mytrade.cache]
+   [mytrade.api]
    [mytrade.data :as data]
    [clerk.core :as clerk]
-   [accountant.core :as accountant]))
+   [accountant.core :as accountant]
+   [taoensso.timbre :as timbre
+    :refer-macros [log  trace  debug  info  warn  error  fatal  report
+                   logf tracef debugf infof warnf errorf fatalf reportf
+                   spy get-env]]
+   ))
 
 ;; -------------------------
 ;; Routes
@@ -37,28 +45,46 @@
       [:li [:a {:href (path-for :items)} "Items of vtrade"]]
       [:li [:a {:href "/broken/link"} "Broken link"]]]]))
 
-
-(def data (atom []))
 (defn pingan-chart
   [{:keys [Data_ACWorthTrend
            Data_grandTotal
-           managers]}]
-  [stock
-   {:chart-data {:rangeSelector {:selected 5},
-                 :title {:text "平安银行历史股价"},
-                 :plotOptions {:series {:showInLegend true}},
-                 :tooltip {:split false, :shared true},
-                 :series [{:id "000001",
-                           :name "470009",
-                           :data @data}
-                          ]}}])
+           managers
+           code
+           type
+           name
+           ]}]
+  (info "stock:" name type)
+  (let [title (str name " ------ " type)]
+    [stock
+     {:chart-data {:rangeSelector {:selected 5},
+                   :title {:text title},
+                   :plotOptions {:series {:showInLegend true}},
+                   :tooltip {:split false, :shared true},
+                   :series [{:id "datas"
+                             :name name
+                             :data Data_ACWorthTrend}
+                            {:id "经理人信息"
+                             :type "flags"
+                             :color "#5F86B3"
+                             :fillColor "#5F86B3"
+                             :onSeries "dataseries"
+                             :width 70
+                             :style {:color "white"}
+                             :states {:hover {:fillColor "#395C84"}}
+                             :data managers}
+                            ]}}]))
 
+
+(def datas (atom []))
 (defn items-page []
   (fn []
-    [:div.columns
-     [:div.column
-      [pingan-chart]]
-    ]))
+    [:div
+     (for [d @datas]
+       ^{:key (:code d)}
+       [:div
+        [pingan-chart d]
+        [:br]])
+     ]))
 
 
 (defn item-page []
@@ -107,7 +133,32 @@
 (defn mount-root []
   (rdom/render [current-page] (.getElementById js/document "app")))
 
+(defn take-datas []
+  (go
+    (try
+      (->> ["000001"  "000006" "000011" "000017" "000020" "000021" "000029" "000030"]
+           (map #(go (<! (data/get-fund %1))))
+           async/merge
+           (async/reduce conj [])
+           <!
+           (reset! datas))
+      (catch :default e
+        (error "error take data:" e)))))
+
+(comment
+  (go (->> (range 10)
+           (map #(go %1))
+           ;; 注意map返回的chan必须为closed,否则会挂起
+           async/merge
+           (async/reduce conj [])
+           <?maybe
+           (js/console.log "result:")
+           ))
+  
+
+  )
 (defn init []
+  ;; (take-datas)
   (clerk/initialize!)
   (accountant/configure-navigation!
    {:nav-handler
@@ -124,6 +175,4 @@
     (fn [path]
       (boolean (reitit/match-by-path router path)))})
   (accountant/dispatch-current!)
-  (mount-root)
-  (go (->> (<! (data/get-fund "470009")) :Data_ACWorthTrend (reset! data )))
-  )
+  (mount-root))

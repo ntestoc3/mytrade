@@ -1,5 +1,6 @@
 (ns mytrade.cache
   (:require [clojure.edn :as edn]
+            [cljs.core.async :as async :refer [go <!]]
             [com.wsscode.async.async-cljs :as wa :refer [go-promise <? <?maybe]]
             [cljs.cache :as c]))
 
@@ -111,7 +112,8 @@
    (go-promise
     (if (c/has? @cache-atom e)
       (get @cache-atom e)
-      (let [d-new-value (<?maybe (wrap-fn value-fn e))]
+      (let [d-new-value (<? (wrap-fn value-fn e))]
+        (js/console.log "new cache value:" d-new-value)
         (swap! cache-atom
                through-cache-old
                e
@@ -212,7 +214,7 @@
 
   (get js/localStorage :e)
 
-  (def C  (localstore-cache :threshold 2))
+  (def C  (localstore-cache :threshold 3))
 
   (through-cache C :a (constantly 1))
 
@@ -240,5 +242,7 @@
 
   (doseq [i (range 25)]
     (through-cache C (str "key" i) (constantly (str "val-" i))))
+
+  (async-lookup-or-miss C :a1 (fn [_] (go 2)))
 
   )

@@ -95,7 +95,7 @@
                            first
                            date->ms-timestamp)
                    "title" name
-                   "text" f"任职时间[{work-range}]:共{days}, 增长率:{percent}"}))
+                   "text" f"{name}<br/>任职时间[{work-range}]:共{days}, 增长率:{percent}"}))
            list)))
 
 (defn get-manager-info
@@ -121,9 +121,10 @@
              (.get info "fund_minsg"))
       (do
         (setv info (select-keys info ["Data_ACWorthTrend" "Data_grandTotal"]))
-        (->> (get-manager-info code)
-             (assoc info "managers"))
-        (save-data f"{code}.json" info)
+        (->> {#** fund
+              #** info
+              "managers" (get-manager-info code)}
+             (save-data f"{code}.json"))
         (logging.info "save-fund-info: %s, ok!" code)
         fund)
       (logging.info "save-fund-info: %s, skipped!" code)))

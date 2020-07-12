@@ -21,9 +21,8 @@
                      ::wa/retry-ms 30000
                      ::wa/timeout 300000
                      }
-                    (go-promise
-                     (info "get all data...")
-                     (<! (api/get-all-funds)))))
+                    (info "get all data...")
+                    (api/get-all-funds)))
 
 (defn- get-fund-info-with-retry
   [code]
@@ -31,9 +30,8 @@
                      ::wa/retry-ms 30000
                      ::wa/timeout 300000
                      }
-                    (go-promise
-                     (info "get fund info:" code)
-                     (<! (api/get-fund-info code)))))
+                    (info "get fund info:" code)
+                    (api/get-fund-info code)))
 
 (defn get-all
   []
