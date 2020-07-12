@@ -39,6 +39,14 @@
   (-> (.now datetime)
       (.strftime "%Y%m%d%H%M%S")))
 
+(defn date->ms-timestamp
+  [date]
+  (-> (datetime.strptime date "%Y-%m-%d")
+      (.timestamp)
+      (* 1000)
+      int)
+  )
+
 (defn get-all-funds
   []
   "获取所有基金条目"
@@ -80,9 +88,15 @@
   (-> (.select-one data "li#fundManagerTab table")
       (select-table-text)
       rest
-      (->2> (lfor row
-                  (-> (zip ["work-range" "name" "days" "percent"] row)
-                      (dict))))))
+      (->> (map (fn [row]
+                  (setv [work-range name days percent] row)
+                  {"x" (-> work-range
+                           (.split "~")
+                           first
+                           date->ms-timestamp)
+                   "title" name
+                   "text" f"任职时间[{work-range}]:共{days}, 增长率:{percent}"}))
+           list)))
 
 (defn get-manager-info
   [code]
