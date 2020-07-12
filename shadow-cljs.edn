@@ -8,7 +8,9 @@
                 [com.taoensso/timbre "4.10.0"]
                 [mount "0.1.16"]
                 [org.clojure/core.async "1.2.603"]
-                [datascript "0.18.13"]
+                [com.wsscode/async "1.0.11"]
+                [org.clojars.mmb90/cljs-cache "0.1.4"]
+                ;; [datascript "0.18.13"]
                 [binaryage/oops "0.7.0"]
                 [metosin/reitit "0.5.1"]
                 [venantius/accountant "0.2.5"

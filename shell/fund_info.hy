@@ -49,7 +49,10 @@
       (.group 0)
       (.replace "," " ")
       read-str
-      eval))
+      eval
+      (->> (map #%(->> %1
+                       (zip ["code" "short-name" "name" "type" "full-name"])
+                       dict)))))
 
 (defn get-fund-history-info
   [code]
@@ -97,7 +100,7 @@
 
 (defn save-fund-info
   [fund]
-  (setv code (of fund 0))
+  (setv code (of fund "code"))
   (logging.info "save-fund-info: %s" code)
   (setv info (get-fund-history-info code))
   (if (and info
@@ -117,7 +120,7 @@
   []
   (os.makedirs data-dir :exist-ok True)
   (->2> (get-all-funds)
-        (filter #%(-> (of %1 3)
+        (filter #%(-> (of %1 "type")
                       (in #{"股票型" "混合型"})))
         (pmap save-fund-info :proc 8)
         (filter identity)

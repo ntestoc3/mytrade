@@ -103,4 +103,7 @@
 
   (go (print (<! (get-data :aa 3))))
 
+
+  (go (.log js/console (<! (get-data 470009))))
+
   )

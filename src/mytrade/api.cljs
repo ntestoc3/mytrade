@@ -10,44 +10,23 @@
                             logf tracef debugf infof warnf errorf fatalf reportf
                             spy get-env]]))
 
-(defn get-r
-  [code]
-  ((-> (str "\"use strict\";" code "; return (r);")
-       (js/Function))))
+(def api-server "http://www.clontr.club:6688/")
 
 (defn get-all-funds
   "获取所有基金代码"
   []
-  (GET "http://fund.eastmoney.com/js/fundcode_search.js"
-      {:handler #(->> (get-r %)
-                      (map (fn [[code short-name name type full-name]]
-                             {:db/id (js/parseInt code)
-                              :code code
-                              :short-name short-name
-                              :name name
-                              :type type
-                              :full-name full-name}))
-                      (db/transact!))}))
-
-(def time-formatter (timef/formatter "yyyyMMddHHmmss"))
-
-(defn curr-times
-  []
-  (timef/unparse time-formatter (time/time-now)))
-
-(def fund-info (atom {}))
-
-(defn get-fund-info
-  [code]
-  (->> ((-> (str "\"use strict\";" code "; return [Data_grandTotal, Data_ACWorthTrend];")
-            (js/Function)))
-       (zipmap [:grand-total :ac-worth-trend])))
+  (let [result (async/promise-chan)]
+    (GET (str api-server "/all_funds.json")
+        {:response-format :json
+         :keywords? true
+         :handler #(async/put! %1)})
+    result))
 
 (defn get-fund-history
   [code]
-  (GET (gstring/format
-        "http://fund.eastmoney.com/pingzhongdata/%s.js?v=%s"
-        code
-        (curr-times))
-      {:handler #(->> (get-fund-info %)
-                      (swap! fund-info assoc code))}))
+  (let [result (async/promise-chan)]
+    (GET (str api-server "/" code ".json")
+        {:response-format :json
+         :keywords? true
+         :handler #(async/put! %1)})
+    result))
