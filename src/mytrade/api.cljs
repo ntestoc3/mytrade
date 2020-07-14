@@ -17,22 +17,22 @@
   []
   (let [result (async/promise-chan)]
     (GET (str api-server "/all_funds.json")
-        {:response-format :json
-         :keywords? true
-         :error-handler (fn [err]
-                          (error err)
-                          (async/put! result err))
-         :handler #(async/put! result %1)})
+      {:response-format :json
+       :keywords? true
+       :error-handler (fn [err]
+                        (error err)
+                        (async/put! result err))
+       :handler #(async/put! result %1)})
     result))
 
 (defn get-fund-info
   [code]
   (let [result (async/promise-chan)]
     (GET (str api-server "/" code ".json")
-        {:response-format :json
-         :keywords? true
-         :error-handler (fn [err]
-                          (error err)
-                          (async/put! result err))
-         :handler #(async/put! result %1)})
+      {:response-format :json
+       :keywords? true
+       :error-handler (fn [err]
+                        (error err)
+                        (async/put! result err))
+       :handler #(async/put! result %1)})
     result))

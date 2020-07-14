@@ -202,9 +202,9 @@
 
 (comment
 
-  (count js/localStorage )
+  (count js/localStorage)
 
-  (get js/localStorage :a )
+  (get js/localStorage :a)
 
   (assoc js/localStorage :e "test")
 
@@ -243,6 +243,4 @@
   (doseq [i (range 25)]
     (through-cache C (str "key" i) (constantly (str "val-" i))))
 
-  (async-lookup-or-miss C :a1 (fn [_] (go 2)))
-
-  )
+  (async-lookup-or-miss C :a1 (fn [_] (go 2))))

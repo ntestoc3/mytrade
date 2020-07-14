@@ -1,6 +1,5 @@
 (ns hooks.sass
-  (:require [clojure.java.shell :refer [sh]])
-  )
+  (:require [clojure.java.shell :refer [sh]]))
 
 (defn watch
   {:shadow.build/stage :configure}

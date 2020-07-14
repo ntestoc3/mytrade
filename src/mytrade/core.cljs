@@ -15,11 +15,11 @@
    [taoensso.timbre :as timbre
     :refer-macros [log  trace  debug  info  warn  error  fatal  report
                    logf tracef debugf infof warnf errorf fatalf reportf
-                   spy get-env]]
-   ))
+                   spy get-env]]))
 
 ;; -------------------------
 ;; Routes
+
 
 (def router
   (reitit/router
@@ -51,10 +51,9 @@
            managers
            code
            type
-           name
-           ]}]
+           name]}]
   (info "stock:" name type)
-  (let [title (str name " ------ " type)]
+  (let [title (str "code: " code " -- " name " ------ " type)]
     [stock
      {:chart-data {:rangeSelector {:selected 5},
                    :title {:text title},
@@ -71,9 +70,7 @@
                              :width 70
                              :style {:color "white"}
                              :states {:hover {:fillColor "#395C84"}}
-                             :data managers}
-                            ]}}]))
-
+                             :data managers}]}}]))
 
 (def datas (atom []))
 (defn items-page []
@@ -83,9 +80,7 @@
        ^{:key (:code d)}
        [:div
         [pingan-chart d]
-        [:br]])
-     ]))
-
+        [:br]])]))
 
 (defn item-page []
   (fn []
@@ -95,7 +90,6 @@
        [:h1 (str "Item " item " of vtrade")]
        [:p [:a {:href (path-for :items)} "Back to the list of items"]]])))
 
-
 (defn about-page []
   (fn [] [:span.main
           [:h1 "About vtrade"]]))
@@ -103,6 +97,7 @@
 
 ;; -------------------------
 ;; Translate routes -> page components
+
 
 (defn page-for [route]
   (case route
@@ -114,6 +109,7 @@
 
 ;; -------------------------
 ;; Page mounting component
+
 
 (defn current-page []
   (fn []
@@ -136,12 +132,10 @@
 (defn take-datas []
   (go
     (try
-      (->> ["000001"  "000006" "000011" "000017" "000020" "000021" "000029" "000030"]
-           (map #(go (<! (data/get-fund %1))))
-           async/merge
-           (async/reduce conj [])
-           <!
-           (reset! datas))
+      (doseq [code ["000001"  "000006" "000011" "000039" "000063"]]
+        (->> (data/get-fund code)
+             <!
+             (swap! datas conj)))
       (catch :default e
         (error "error take data:" e)))))
 
@@ -152,13 +146,18 @@
            async/merge
            (async/reduce conj [])
            <?maybe
-           (js/console.log "result:")
-           ))
-  
+           (js/console.log "result:")))
 
-  )
+  (let [c1 (async/chan)
+        c2 (async/timeout 3000)]
+    (go (let [[value c] (async/alts! [c1 c2])]
+          (js/console.log "value:" value)
+          (when (= c c2)
+            (js/console.log "timouted!"))))
+    c1))
+
 (defn init []
-  ;; (take-datas)
+  (take-datas)
   (clerk/initialize!)
   (accountant/configure-navigation!
    {:nav-handler
@@ -169,8 +168,7 @@
         (reagent/after-render clerk/after-render!)
         (session/put! :route {:current-page (page-for current-page)
                               :route-params route-params})
-        (clerk/navigate-page! path)
-        ))
+        (clerk/navigate-page! path)))
     :path-exists?
     (fn [path]
       (boolean (reitit/match-by-path router path)))})

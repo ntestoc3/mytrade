@@ -42,7 +42,7 @@
               (let [[_ {:keys [chart-meta chart-data]}] (reagent/argv this)
                     chart-id (:id chart-meta)
                     chart-instance (.chart js/Highcharts (rdom/dom-node this)
-                                                         (clj->js chart-data))]
+                                           (clj->js chart-data))]
                 (swap! chart-instances assoc chart-id chart-instance)))
             (update-chart
               [this]
@@ -54,7 +54,7 @@
                   (->> (:series chart-data)
                        (map #(vector (:id %) %))
                        (into {})
-                       (ensure-series chart-instance (map :id (:series chart-data)) ))
+                       (ensure-series chart-instance (map :id (:series chart-data))))
                   (mount-chart this))))]
       (reagent/create-class {:reagent-render render-chart
                              :component-did-mount mount-chart
@@ -84,7 +84,7 @@
                   (->> (:series chart-data)
                        (map #(vector (:id %) %))
                        (into {})
-                       (ensure-series chart-instance (map :id (:series chart-data)) ))
+                       (ensure-series chart-instance (map :id (:series chart-data))))
                   (mount-chart this))))]
       (reagent/create-class {:reagent-render render-chart
                              :component-did-mount mount-chart

@@ -8,19 +8,19 @@
             [taoensso.timbre :as timbre
              :refer-macros [log  trace  debug  info  warn  error  fatal  report
                             logf tracef debugf infof warnf errorf fatalf reportf
-                            spy get-env]]
-            ))
+                            spy get-env]]))
 
 
 ;; 最大保存100条历史
+
+
 (defonce C (cache/localstore-cache :threshold 100))
 
 (defn- get-all-data-with-retry
   []
   (wa/pulling-retry {::wa/done? (comp not :failure)
                      ::wa/retry-ms 30000
-                     ::wa/timeout 300000
-                     }
+                     ::wa/timeout 300000}
                     (info "get all data...")
                     (api/get-all-funds)))
 
@@ -28,8 +28,7 @@
   [code]
   (wa/pulling-retry {::wa/done? (comp not :failure)
                      ::wa/retry-ms 30000
-                     ::wa/timeout 300000
-                     }
+                     ::wa/timeout 300000}
                     (info "get fund info:" code)
                     (api/get-fund-info code)))
 
