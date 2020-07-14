@@ -25,9 +25,6 @@
 (def router
   (reitit/router
    [["/" :index]
-    ["/items"
-     ["" :items]
-     ["/:item-id" :item]]
     ["/about" :about]]))
 
 (defn path-for [route & [params]]
@@ -38,14 +35,6 @@
 ;; -------------------------
 ;; Page components
 
-(defn home-page []
-  (fn []
-    [:span.main
-     [:h1 "Welcome to vtrade"]
-     [:ul
-      [:li [:a {:href (path-for :items)} "Items of vtrade"]]
-      [:li [:a {:href "/broken/link"} "Broken link"]]]]))
-
 (defn pingan-chart []
   (fn [{:keys [Data_ACWorthTrend
                Data_grandTotal
@@ -54,24 +43,49 @@
                type
                name]}]
     (info "stock:" code type)
-    (let [title (str "code: " code " -- " name " ------ " type)]
-      [stock
-       {:chart-data {:rangeSelector {:selected 5},
-                     :title {:text title},
-                     :plotOptions {:series {:showInLegend true}},
-                     :tooltip {:split false, :shared true},
-                     :series [{:id "datas"
-                               :name name
-                               :data Data_ACWorthTrend}
-                              {:id "经理人信息"
-                               :type "flags"
-                               :color "#5F86B3"
-                               :fillColor "#5F86B3"
-                               :onSeries "dataseries"
-                               :width 70
-                               :style {:color "white"}
-                               :states {:hover {:fillColor "#395C84"}}
-                               :data managers}]}}])))
+    [:div.card
+     [:header.card-header>p.card-header-title
+      (str "代码: " code " -- " name " ------ " type)]
+     [:div.card-content>div.content>div.columns
+      [:div.column
+       [stock
+        {:chart-data {:rangeSelector {:selected 5},
+                      :title {:text (str name "  累计净值走势")},
+                      :plotOptions {:series {:showInLegend true}},
+                      :tooltip {:split false
+                                :shared true
+                                :valeDecimals 4},
+                      :series [{:id "datas"
+                                :name name
+                                :data Data_ACWorthTrend
+                                }
+                               {:id "经理人信息"
+                                :type "flags"
+                                :color "#5F86B3"
+                                :fillColor "#5F86B3"
+                                ;; :onSeries "datas"
+                                :width 70
+                                :style {:color "white"}
+                                :states {:hover {:fillColor "#395C84"}}
+                                :data managers
+                                }]}}]]
+      [:div.column
+       [stock
+        {:chart-data {:rangeSelector {:selected 5},
+                      :title {:text (str name "  累计收益率走势")},
+                      :plotOptions {:series {:showInLegend true}},
+                      :tooltip {:split false
+                                :shared true
+                                :valeDecimals 4},
+                      :series (conj Data_grandTotal
+                                    {:id "经理人信息"
+                                     :type "flags"
+                                     :color "#5F86B3"
+                                     :fillColor "#5F86B3"
+                                     :width 70
+                                     :style {:color "white"}
+                                     :states {:hover {:fillColor "#395C84"}}
+                                     :data managers})}}]]]]))
 
 (def datas (atom []))
 (def have-data (atom true))
@@ -109,18 +123,20 @@
       (catch :default e
         (error "take data:" e)))))
 
-(defn items-page []
+(defn home-page []
   (fn []
-    [:div.stocks
-     (for [d @datas]
-       ^{:key (:code d)}
-       [:div
-        [pingan-chart d]
-        [:br]])
-     [infinite-scroll
-      {:can-show-more? @have-data
-       :load-fn take-datas}]
-     ]))
+    [:div.columns.is-centered
+     [:div.column.is-four-fifths
+      (for [d @datas]
+        ^{:key (:code d)}
+        [:div
+         [pingan-chart d]
+         [:br]])
+      [infinite-scroll
+       {:can-show-more? @have-data
+        :load-fn take-datas}]
+      ]]))
+
 
 (defn about-page []
   (fn [] [:span.main
@@ -134,8 +150,7 @@
 (defn page-for [route]
   (case route
     :index #'home-page
-    :about #'about-page
-    :items #'items-page))
+    :about #'about-page))
 
 
 ;; -------------------------

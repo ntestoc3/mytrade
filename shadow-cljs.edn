@@ -29,7 +29,8 @@
             :output-to "public/js/app.js"
             :asset-path "/js"
             :modules {:app {:init-fn mytrade.core/init}}
-            :devtools {:preloads [shadow.remote.runtime.cljs.browser]}
+            :devtools {:preloads [shadow.remote.runtime.cljs.browser]
+                       :after-load mytrade.core/init}
             :build-hooks [(hooks.sass/watch)]
             :compiler-options {:infer-externs :auto
                                :externs ["datascript/externs.js"]} 
