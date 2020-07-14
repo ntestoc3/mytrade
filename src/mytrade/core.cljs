@@ -10,6 +10,7 @@
    [mytrade.cache]
    [mytrade.api]
    [mytrade.data :as data]
+   [mytrade.infinite-scroll :refer [infinite-scroll]]
    [clerk.core :as clerk]
    [accountant.core :as accountant]
    [taoensso.timbre :as timbre
@@ -45,50 +46,81 @@
       [:li [:a {:href (path-for :items)} "Items of vtrade"]]
       [:li [:a {:href "/broken/link"} "Broken link"]]]]))
 
-(defn pingan-chart
-  [{:keys [Data_ACWorthTrend
-           Data_grandTotal
-           managers
-           code
-           type
-           name]}]
-  (info "stock:" name type)
-  (let [title (str "code: " code " -- " name " ------ " type)]
-    [stock
-     {:chart-data {:rangeSelector {:selected 5},
-                   :title {:text title},
-                   :plotOptions {:series {:showInLegend true}},
-                   :tooltip {:split false, :shared true},
-                   :series [{:id "datas"
-                             :name name
-                             :data Data_ACWorthTrend}
-                            {:id "经理人信息"
-                             :type "flags"
-                             :color "#5F86B3"
-                             :fillColor "#5F86B3"
-                             :onSeries "dataseries"
-                             :width 70
-                             :style {:color "white"}
-                             :states {:hover {:fillColor "#395C84"}}
-                             :data managers}]}}]))
+(defn pingan-chart []
+  (fn [{:keys [Data_ACWorthTrend
+               Data_grandTotal
+               managers
+               code
+               type
+               name]}]
+    (info "stock:" code type)
+    (let [title (str "code: " code " -- " name " ------ " type)]
+      [stock
+       {:chart-data {:rangeSelector {:selected 5},
+                     :title {:text title},
+                     :plotOptions {:series {:showInLegend true}},
+                     :tooltip {:split false, :shared true},
+                     :series [{:id "datas"
+                               :name name
+                               :data Data_ACWorthTrend}
+                              {:id "经理人信息"
+                               :type "flags"
+                               :color "#5F86B3"
+                               :fillColor "#5F86B3"
+                               :onSeries "dataseries"
+                               :width 70
+                               :style {:color "white"}
+                               :states {:hover {:fillColor "#395C84"}}
+                               :data managers}]}}])))
 
 (def datas (atom []))
+(def have-data (atom true))
+(def codes (atom []))
+(def load-count (atom 0))
+(def batch-size 8)
+
+(defn take-codes
+  []
+  (go
+    (try
+      (info "take-codes.")
+      (when-not (seq @codes)
+        (->> (data/get-all)
+             <!
+             (map :code)
+             (reset! codes)))
+      (catch :default e
+        (error "take-codes:" e)))))
+
+(defn take-datas []
+  (info "take-datas!!")
+  (go
+    (try
+      (<! (take-codes))
+      (doseq [code (->> @codes
+                        (drop @load-count)
+                        (take batch-size))]
+        (->> (data/get-fund code)
+             <!
+             (swap! datas conj)))
+      (swap! load-count #(+ batch-size %1))
+      (when (>= @load-count (count @codes))
+        (reset! have-data false))
+      (catch :default e
+        (error "take data:" e)))))
+
 (defn items-page []
   (fn []
-    [:div
+    [:div.stocks
      (for [d @datas]
        ^{:key (:code d)}
        [:div
         [pingan-chart d]
-        [:br]])]))
-
-(defn item-page []
-  (fn []
-    (let [routing-data (session/get :route)
-          item (get-in routing-data [:route-params :item-id])]
-      [:span.main
-       [:h1 (str "Item " item " of vtrade")]
-       [:p [:a {:href (path-for :items)} "Back to the list of items"]]])))
+        [:br]])
+     [infinite-scroll
+      {:can-show-more? @have-data
+       :load-fn take-datas}]
+     ]))
 
 (defn about-page []
   (fn [] [:span.main
@@ -103,8 +135,7 @@
   (case route
     :index #'home-page
     :about #'about-page
-    :items #'items-page
-    :item #'item-page))
+    :items #'items-page))
 
 
 ;; -------------------------
@@ -128,16 +159,6 @@
 
 (defn mount-root []
   (rdom/render [current-page] (.getElementById js/document "app")))
-
-(defn take-datas []
-  (go
-    (try
-      (doseq [code ["000001"  "000006" "000011" "000039" "000063"]]
-        (->> (data/get-fund code)
-             <!
-             (swap! datas conj)))
-      (catch :default e
-        (error "error take data:" e)))))
 
 (comment
   (go (->> (range 10)

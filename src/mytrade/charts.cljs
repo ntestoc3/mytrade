@@ -3,7 +3,7 @@
             [reagent.dom :as rdom]
             [oops.core :refer [gget gcall oget oset! ocall oapply ocall! oapply!
                                gget+ oget+ oset!+ ocall+ oapply+ ocall!+ oapply!+]]
-            ;;["highcharts/highstock" :as Highcharts]
+            ["highcharts/highstock" :as Highcharts]
             ))
 
 ; Highcharts wants to maintain its own instance, with mutating state.
@@ -41,7 +41,7 @@
               [this]
               (let [[_ {:keys [chart-meta chart-data]}] (reagent/argv this)
                     chart-id (:id chart-meta)
-                    chart-instance (.chart js/Highcharts (rdom/dom-node this)
+                    chart-instance (.chart Highcharts (rdom/dom-node this)
                                            (clj->js chart-data))]
                 (swap! chart-instances assoc chart-id chart-instance)))
             (update-chart
@@ -70,7 +70,7 @@
               [this]
               (let [[_ {:keys [chart-meta chart-data]}] (reagent/argv this)
                     chart-id (:id chart-meta)
-                    chart-instance (ocall js/Highcharts "stockChart"
+                    chart-instance (ocall Highcharts "stockChart"
                                           (rdom/dom-node this)
                                           (clj->js chart-data))]
                 (swap! stock-instances assoc chart-id chart-instance)))
