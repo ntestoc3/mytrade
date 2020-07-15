@@ -56,6 +56,7 @@
                                 :shared true
                                 :valeDecimals 4},
                       :series [{:id "datas"
+                                :type "area"
                                 :name name
                                 :data Data_ACWorthTrend
                                 }
@@ -72,20 +73,17 @@
       [:div.column
        [stock
         {:chart-data {:rangeSelector {:selected 5},
-                      :title {:text (str name "  累计收益率走势")},
-                      :plotOptions {:series {:showInLegend true}},
-                      :tooltip {:split false
-                                :shared true
-                                :valeDecimals 4},
-                      :series (conj Data_grandTotal
-                                    {:id "经理人信息"
-                                     :type "flags"
-                                     :color "#5F86B3"
-                                     :fillColor "#5F86B3"
-                                     :width 70
-                                     :style {:color "white"}
-                                     :states {:hover {:fillColor "#395C84"}}
-                                     :data managers})}}]]]]))
+                      :title {:text (str name "  6month累计收益率走势")},
+                      :yAxis {:labels {:formatter #(this-as axis
+                                                     (str (when (pos? (.-value axis))
+                                                            " + " )
+                                                          (-> (.-value axis)
+                                                              (.toFixed 2))
+                                                          "%"))}}
+                      :tooltip {:valeDecimals 2
+                                :xDateFormat "%Y-%m-%d"
+                                :pointFormat "<span style=\"color:{series.color}\">{series.name}</span>: <b>{point.y}%</b> <br/>"},
+                      :series Data_grandTotal}}]]]]))
 
 (def datas (atom []))
 (def have-data (atom true))
@@ -132,6 +130,8 @@
         [:div
          [pingan-chart d]
          [:br]])
+
+      ;; 滚动加载
       [infinite-scroll
        {:can-show-more? @have-data
         :load-fn take-datas}]

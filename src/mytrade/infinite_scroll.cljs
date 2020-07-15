@@ -71,8 +71,8 @@
                                    (when can-show-more?
                                      (when-not @listener-fn
                                        (reset! listener-fn (partial debounced-scroll-listener this))
-                                       (.addEventListener js/window "scroll" @listener-fn true)
-                                       (.addEventListener js/window "resize" @listener-fn true)))))]
+                                       (.addEventListener js/window "scroll" @listener-fn)
+                                       (.addEventListener js/window "resize" @listener-fn)))))]
     (r/create-class
       {:component-did-mount
        (fn [this]

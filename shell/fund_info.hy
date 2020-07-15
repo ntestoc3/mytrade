@@ -20,6 +20,15 @@
                   `(~node ~ret))))
   ret)
 
+(defmacro bench [&rest body]
+  (import time)
+  (setv start-time (gensym "start-time"))
+  (setv end-time (gensym "end-time"))
+  `(do (setv ~start-time (time.time))
+       ~@body
+       (setv ~end-time (time.time))
+       (print (.format "total run time: {:.5f} s" (- ~end-time ~start-time)))))
+
 (defn select-keys
   [d ks]
   (->> (.items d)
@@ -47,10 +56,13 @@
       int)
   )
 
+(setv common-headers {"user-agent" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.87 Safari/537.36"})
+
 (defn get-all-funds
   []
   "获取所有基金条目"
-  (-> (requests.get "http://fund.eastmoney.com/js/fundcode_search.js")
+  (-> (requests.get "http://fund.eastmoney.com/js/fundcode_search.js"
+                    :headers common-headers)
       (doto (setattr "encoding" "gbk2312"))
       (. text)
       (->> (re.search "(\[\[.*\]\])"))
@@ -62,11 +74,32 @@
                        (zip ["code" "short-name" "name" "type" "full-name"])
                        dict)))))
 
+(defn get-fund-total-syl
+  [code]
+  "获取累计收益率"
+  (setv data (requests.get "http://api.fund.eastmoney.com/pinzhong/LJSYLZS"
+                           :params {"fundCode" code
+                                    "indexcode" "000300"
+                                    "type" "se"
+                                    }
+                           :headers {#** common-headers
+                                     "Accept" "application/json"
+                                     "Referer" f"http://fund.eastmoney.com/{code}.html"}))
+  (when (= 200 data.status-code)
+    (setv result (data.json))
+    (if (zero? (of result "ErrCode" ))
+        (of result "Data")
+        (logging.error (format "get-fund-total-syl {0} msg:{1}"
+                               (of result "ErrCode")
+                               (of result "ErrMsg"))))))
+
 (defn get-fund-history-info
   [code]
   "获取fund历史信息"
   (setv t (curr-times))
-  (setv data (requests.get f"http://fund.eastmoney.com/pingzhongdata/{code}.js?v={t}"))
+  (setv data (requests.get f"http://fund.eastmoney.com/pingzhongdata/{code}.js?v={t}"
+                           :headers (dict common-headers
+                                          :referer f"http://fund.eastmoney.com/{code}.html")))
   (when (= 200 data.status-code)
     (setattr data "encoding" "gbk2312")
     (->2> data.text
@@ -120,9 +153,9 @@
   (if (and info
              (.get info "fund_minsg"))
       (do
-        (setv info (select-keys info ["Data_ACWorthTrend" "Data_grandTotal"]))
         (->> {#** fund
-              #** info
+              "Data_ACWorthTrend" (of info "Data_ACWorthTrend")
+              "Data_grandTotal" (get-fund-total-syl code)
               "managers" (get-manager-info code)}
              (save-data f"{code}.json"))
         (logging.info "save-fund-info: %s, ok!" code)
@@ -137,7 +170,8 @@
   (->2> (get-all-funds)
         (filter #%(-> (of %1 "type")
                       (in #{"股票型" "混合型"})))
-        (pmap save-fund-info :proc 8)
+        ;; (pmap save-fund-info :proc 8) ;; 并发会被服务器拒绝连接
+        (map save-fund-info)
         (filter identity)
         list
         (save-data "all_funds.json")))
