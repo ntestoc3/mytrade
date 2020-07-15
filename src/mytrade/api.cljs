@@ -1,10 +1,8 @@
 (ns mytrade.api
   (:require [ajax.core :refer [GET POST]]
-            [cljs-time.core :as time]
             [cljs.core.async :as async :refer [go <!]]
             [com.wsscode.async.async-cljs :as wa :refer [go-promise <? <?maybe]]
             [goog.string :as gstring]
-            [cljs-time.format :as timef]
             [taoensso.timbre :as timbre
              :refer-macros [log  trace  debug  info  warn  error  fatal  report
                             logf tracef debugf infof warnf errorf fatalf reportf

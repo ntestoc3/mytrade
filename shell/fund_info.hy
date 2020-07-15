@@ -127,7 +127,7 @@
                            (.split "~")
                            first
                            date->ms-timestamp)
-                   "title" name
+                   "title" (first name)
                    "text" f"{name}<br/>任职时间[{work-range}]:共{days}, 增长率:{percent}"}))
            list)))
 

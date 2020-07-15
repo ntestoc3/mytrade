@@ -5,6 +5,9 @@
    [reagent.session :as session]
    [cljs.core.async :as async :refer [go <!]]
    [com.wsscode.async.async-cljs :as wa :refer [go-promise <? <?maybe]]
+   [cljs-time.core :as time]
+   [cljs-time.format :as timef]
+   [cljs-time.coerce :as timec]
    [reitit.frontend :as reitit]
    [mytrade.charts :refer [stock]]
    [mytrade.cache]
@@ -13,10 +16,13 @@
    [mytrade.infinite-scroll :refer [infinite-scroll]]
    [clerk.core :as clerk]
    [accountant.core :as accountant]
+   [oops.core :refer [gget gset! gcall oget oset! ocall oapply ocall! oapply!
+                      gget+ gset!+ oget+ oset!+ ocall+ oapply+ ocall!+ oapply!+]]
    [taoensso.timbre :as timbre
     :refer-macros [log  trace  debug  info  warn  error  fatal  report
                    logf tracef debugf infof warnf errorf fatalf reportf
-                   spy get-env]]))
+                   spy get-env]]
+   [clojure.string :as str]))
 
 ;; -------------------------
 ;; Routes
@@ -34,6 +40,21 @@
 
 ;; -------------------------
 ;; Page components
+
+(defn format-unix-time
+  [ut]
+  (->> (timec/from-long ut)
+       (timef/unparse {:format-str "yyyy-MM-dd"})))
+
+(defn format-sy-point
+  [p]
+  (str
+   "<span style=\"color:" (oget p "series.color") "\">"
+   (oget p "series.name")
+   "</span>:<b>"
+   (-> (oget p "y")
+       (.toFixed 2))
+   "%</b>"))
 
 (defn pingan-chart []
   (fn [{:keys [Data_ACWorthTrend
@@ -53,8 +74,20 @@
                       :title {:text (str name "  累计净值走势")},
                       :plotOptions {:series {:showInLegend true}},
                       :tooltip {:split false
-                                :shared true
-                                :valeDecimals 4},
+                                :shared false
+                                :valeDecimals 4
+                                :style {:fontSize "16px"}
+                                :formatter #(this-as tooltip
+                                              (str (-> (oget tooltip "x")
+                                                       format-unix-time)
+                                                   "<br/>"
+                                                   (when-let [y (oget tooltip "y")]
+                                                     (str " 累计净值: "
+                                                          (.toFixed y 4)))
+                                                   (when-let [text (oget tooltip "?point.?text")]
+                                                     text)
+                                                   "<br/>"))
+                                },
                       :series [{:id "datas"
                                 :type "area"
                                 :name name
@@ -65,7 +98,10 @@
                                 :color "#5F86B3"
                                 :fillColor "#5F86B3"
                                 ;; :onSeries "datas"
-                                :width 70
+                                :shape "circlepin"
+                                :dataLabels {:shape "circle"}
+                                :width 20
+                                :textAlign "center"
                                 :style {:color "white"}
                                 :states {:hover {:fillColor "#395C84"}}
                                 :data managers
@@ -73,17 +109,40 @@
       [:div.column
        [stock
         {:chart-data {:rangeSelector {:selected 5},
-                      :title {:text (str name "  6month累计收益率走势")},
+                      :title {:text (str name "  累计收益率走势")},
                       :yAxis {:labels {:formatter #(this-as axis
-                                                     (str (when (pos? (.-value axis))
+                                                     (str (when (pos? (oget axis "value"))
                                                             " + " )
-                                                          (-> (.-value axis)
+                                                          (-> (oget axis "value")
                                                               (.toFixed 2))
                                                           "%"))}}
                       :tooltip {:valeDecimals 2
                                 :xDateFormat "%Y-%m-%d"
-                                :pointFormat "<span style=\"color:{series.color}\">{series.name}</span>: <b>{point.y}%</b> <br/>"},
-                      :series Data_grandTotal}}]]]]))
+                                :style {:fontSize "16px"}
+                                :formatter #(this-as tooltip
+                                              (str (-> (.-x tooltip) format-unix-time)
+                                                   "<br/>"
+                                                   (if-let [text (oget tooltip "?point.?text")]
+                                                     text
+                                                     (->> (.-points tooltip)
+                                                          (map format-sy-point)
+                                                          (str/join "<br/>")))))
+                                },
+                      :series (conj Data_grandTotal
+                                    {:id "经理人信息"
+                                     :type "flags"
+                                     :color "#5F86B3"
+                                     :fillColor "#5F86B3"
+                                     ;; :onSeries "datas"
+                                     :shape "circlepin"
+                                     :dataLabels {:shape "circle"}
+                                     :width 20
+                                     :textAlign "center"
+                                     :style {:color "white"}
+                                     :states {:hover {:fillColor "#395C84"}}
+                                     :data managers
+                                     }
+                                    )}}]]]]))
 
 (def datas (atom []))
 (def have-data (atom true))
