@@ -149,6 +149,7 @@
 (def codes (atom []))
 (def load-count (atom 0))
 (def batch-size 8)
+(def loading (atom true))
 
 (defn take-codes
   []
@@ -167,6 +168,7 @@
   (info "take-datas!!")
   (go
     (try
+      (go (reset! loading true))
       (<! (take-codes))
       (doseq [code (->> @codes
                         (drop @load-count)
@@ -178,7 +180,9 @@
       (when (>= @load-count (count @codes))
         (reset! have-data false))
       (catch :default e
-        (error "take data:" e)))))
+        (error "take data:" e))
+      (finally
+        (reset! loading false)))))
 
 (defn home-page []
   (fn []
@@ -194,6 +198,11 @@
       [infinite-scroll
        {:can-show-more? @have-data
         :load-fn take-datas}]
+      [:button.button.is-fullwidth
+       {:class (when @loading
+                 "is-loading")
+        :on-click #(take-datas)}
+       "加载更多"]
       ]]))
 
 

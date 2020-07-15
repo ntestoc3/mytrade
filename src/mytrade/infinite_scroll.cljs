@@ -58,6 +58,7 @@
                                     (.-innerHeight js/window))
                                  threshold)))
         scroll-listener (fn [this]
+                          (js/console.log "scroll-listener:" this)
                           (when (safe-component-mounted? this)
                             (let [{:keys [load-fn can-show-more?]} (r/props this)]
                               (when (and can-show-more?
