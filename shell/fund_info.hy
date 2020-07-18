@@ -11,6 +11,8 @@
 (import logging)
 (import [datetime [datetime]])
 
+;; pip install bs4 requests lxml
+
 (defmacro ->2> [head &rest args]
   "Thread macro for second arg"
   (setv ret head)

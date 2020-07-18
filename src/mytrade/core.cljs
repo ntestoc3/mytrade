@@ -149,7 +149,7 @@
 (def codes (atom []))
 (def load-count (atom 0))
 (def batch-size 8)
-(def loading (atom true))
+(def loading (atom false))
 
 (defn take-codes
   []
@@ -165,24 +165,27 @@
         (error "take-codes:" e)))))
 
 (defn take-datas []
-  (info "take-datas!!")
-  (go
-    (try
-      (go (reset! loading true))
-      (<! (take-codes))
-      (doseq [code (->> @codes
-                        (drop @load-count)
-                        (take batch-size))]
-        (->> (data/get-fund code)
-             <!
-             (swap! datas conj)))
-      (swap! load-count #(+ batch-size %1))
-      (when (>= @load-count (count @codes))
-        (reset! have-data false))
-      (catch :default e
-        (error "take data:" e))
-      (finally
-        (reset! loading false)))))
+  (when-not @loading
+    (info "take-datas!!")
+    (go
+      (try
+        (reset! loading true)
+        (<! (take-codes))
+        (doseq [code (->> @codes
+                          (drop @load-count)
+                          (take batch-size))]
+          (->> (data/get-fund code)
+               <!
+               (swap! datas conj))
+          ;; 通过timeout交出cpu执行，让ui正常刷新
+          (<! (async/timeout 200)))
+        (swap! load-count #(+ batch-size %1))
+        (when (>= @load-count (count @codes))
+          (reset! have-data false))
+        (catch :default e
+          (error "take data:" e))
+        (finally
+          (reset! loading false))))))
 
 (defn home-page []
   (fn []
