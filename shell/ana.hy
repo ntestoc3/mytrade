@@ -56,5 +56,7 @@
            (map (fn [info]
                   {"code" (of info "code")
                    "slope" (get-ac-worth-slope info)}))
-           (sorted :key #%(of %1 "slope")))
+           (sorted :key #%(of %1 "slope"))
+           reversed
+           list)
       (json.dump f)))

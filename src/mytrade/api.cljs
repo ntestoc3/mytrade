@@ -10,27 +10,18 @@
 
 (def api-server "http://www.clontr.club:6688/")
 
-(defn get-all-funds
-  "获取所有基金代码"
-  []
+(defn- get-data
+  [data-name]
   (let [result (async/promise-chan)]
-    (GET (str api-server "/all_funds.json")
-      {:response-format :json
-       :keywords? true
-       :error-handler (fn [err]
-                        (error err)
-                        (async/put! result err))
-       :handler #(async/put! result %1)})
+    (GET (str api-server "/" data-name ".json")
+        {:response-format :json
+         :keywords? true
+         :error-handler (fn [err]
+                          (error err)
+                          (async/put! result err))
+         :handler #(async/put! result %1)})
     result))
 
-(defn get-fund-info
-  [code]
-  (let [result (async/promise-chan)]
-    (GET (str api-server "/" code ".json")
-      {:response-format :json
-       :keywords? true
-       :error-handler (fn [err]
-                        (error err)
-                        (async/put! result err))
-       :handler #(async/put! result %1)})
-    result))
+(def get-all-funds "获取所有基金代码" #(get-data "all_funds"))
+(def get-fund-info "获取指定基金代码的信息" get-data)
+(def get-code-slopes "获取所有基金的斜率" #(get-data "slopes"))
