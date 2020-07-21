@@ -1,7 +1,13 @@
 (ns mytrade.event
   (:require [kee-frame.core :as k :refer [reg-controller reg-chain reg-event-db reg-event-fx]]
             [re-frame.core :as rf]
-            [mytrade.utils :as utils :refer [>evt <sub]]))
+            [cljs.core.async :as async :refer [go <!]]
+            [mytrade.data :as data]
+            [mytrade.utils :as utils :refer [>evt <sub >evt-sync]]
+            [taoensso.timbre :as timbre
+             :refer-macros [log  trace  debug  info  warn  error  fatal  report
+                            logf tracef debugf infof warnf errorf fatalf reportf
+                            spy get-env]]))
 
 ;; 要显示的基金代码
 (utils/sub-and-evt-db2 :codes [:codes])
@@ -37,3 +43,58 @@
        (>= new-count codes-count) (assoc-in [:load-state :have-data?] false)
        :always (assoc-in [:load-state :count] new-count)))))
 
+;; ------------------------
+;; Data helper
+(defn take-codes
+  []
+  (go
+    (try
+      (info "take-codes.")
+      (when-not (seq (<sub [:codes]))
+        (->> (data/get-all)
+             <!
+             (map :code)
+             (>evt-sync [:codes]))
+        true)
+      (catch :default e
+        (error "take-codes:" e)))))
+
+(defn take-slope-codes
+  []
+  (go
+    (try
+      (info "take slope codes.")
+      (when-not (seq (<sub [:codes]))
+        (->> (data/get-slopes)
+             <!
+             (map :code)
+             (>evt-sync [:codes]))
+        true)
+      (catch :default e
+        (error "take slope codes:" e)))))
+
+(defn take-datas []
+  (when-not (<sub [:loading?])
+    (info "take-datas!!")
+    (go
+      (try
+        (>evt [:loading? true])
+        ;;(<! (take-codes))
+        (<! (take-slope-codes))
+        (info "take codes ok.")
+        (doseq [code (<sub [:unloaded-codes])]
+          (->> (data/get-fund code)
+               <!
+               (>evt [:add-datas]))
+          ;; 通过timeout交出cpu执行，让ui正常刷新
+          (<! (async/timeout 200)))
+        (>evt [:datas-take-over])
+        (catch :default e
+          (error "take data:" e))
+        (finally
+          (>evt [:loading? false]))))))
+
+(reg-event-fx :take-datas
+              (fn [_ _]
+                (take-datas)
+                nil))

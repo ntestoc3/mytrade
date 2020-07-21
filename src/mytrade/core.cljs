@@ -17,7 +17,6 @@
    [mytrade.api]
    [mytrade.subs]
    [mytrade.event]
-   [mytrade.data :as data]
    [mytrade.utils :refer [>evt <sub >evt-sync]]
    [mytrade.infinite-scroll :refer [infinite-scroll]]
    [oops.core :refer [gget gset! gcall oget oset! ocall oapply ocall! oapply!
@@ -28,54 +27,13 @@
                    spy get-env]]
    [clojure.string :as str]))
 
-;; ------------------------
-;; Data helper
-(defn take-codes
-  []
-  (go
-    (try
-      (info "take-codes.")
-      (when-not (seq (<sub [:codes]))
-        (->> (data/get-all)
-             <!
-             (map :code)
-             (>evt-sync [:codes])))
-      (catch :default e
-        (error "take-codes:" e)))))
-
-(defn take-slope-codes
-  []
-  (go
-    (try
-      (info "take slope codes.")
-      (when-not (seq (<sub [:codes]))
-        (->> (data/get-slopes)
-             <!
-             (map :code)
-             (>evt-sync [:codes])))
-      (catch :default e
-        (error "take slope codes:" e)))))
-
-(defn take-datas []
-  (when-not (<sub [:loading?])
-    (info "take-datas!!")
-    (go
-      (try
-        (>evt [:loading? true])
-        ;;(<! (take-codes))
-        (<! (take-slope-codes))
-        (doseq [code (<sub [:unloaded-codes])]
-          (->> (data/get-fund code)
-               <!
-               (>evt [:add-datas]))
-          ;; 通过timeout交出cpu执行，让ui正常刷新
-          (<! (async/timeout 200)))
-        (>evt [:datas-take-over])
-        (catch :default e
-          (error "take data:" e))
-        (finally
-          (>evt [:loading? false]))))))
-
+;; Controller
+(k/reg-controller :take-datas
+                  {:params (fn [{:keys [data path-params]}]
+                             (when (= (:name data) :index)
+                               true))
+                   :start (fn [ctx _]
+                            [:take-datas])})
 
 ;; -------------------------
 ;; Page components
@@ -195,11 +153,11 @@
       ;; 滚动加载
       [infinite-scroll
        {:can-show-more? (<sub [:have-data?])
-        :load-fn take-datas}]
+        :load-fn #(>evt [:take-datas])}]
       [:button.button.is-fullwidth
        {:class (when (<sub [:loading?])
                  "is-loading")
-        :on-click #(take-datas)}
+        :on-click #(>evt [:take-datas])}
        "加载更多"]
       ]]))
 
