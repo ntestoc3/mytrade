@@ -2,20 +2,24 @@
   (:require
    [reagent.core :as reagent :refer [atom]]
    [reagent.dom :as rdom]
-   [reagent.session :as session]
+   [re-frame.core :as rf]
    [cljs.core.async :as async :refer [go <!]]
    [com.wsscode.async.async-cljs :as wa :refer [go-promise <? <?maybe]]
    [cljs-time.core :as time]
    [cljs-time.format :as timef]
    [cljs-time.coerce :as timec]
    [reitit.frontend :as reitit]
+   [kee-frame.core :as k :refer [reg-controller reg-chain reg-event-db reg-event-fx]]
+   [kee-frame.error :as error]
+   [kee-frame.scroll]
    [mytrade.charts :refer [stock]]
    [mytrade.cache]
    [mytrade.api]
+   [mytrade.subs]
+   [mytrade.event]
    [mytrade.data :as data]
+   [mytrade.utils :refer [>evt <sub >evt-sync]]
    [mytrade.infinite-scroll :refer [infinite-scroll]]
-   [clerk.core :as clerk]
-   [accountant.core :as accountant]
    [oops.core :refer [gget gset! gcall oget oset! ocall oapply ocall! oapply!
                       gget+ gset!+ oget+ oset!+ ocall+ oapply+ ocall!+ oapply!+]]
    [taoensso.timbre :as timbre
@@ -24,19 +28,54 @@
                    spy get-env]]
    [clojure.string :as str]))
 
-;; -------------------------
-;; Routes
+;; ------------------------
+;; Data helper
+(defn take-codes
+  []
+  (go
+    (try
+      (info "take-codes.")
+      (when-not (seq (<sub [:codes]))
+        (->> (data/get-all)
+             <!
+             (map :code)
+             (>evt-sync [:codes])))
+      (catch :default e
+        (error "take-codes:" e)))))
 
+(defn take-slope-codes
+  []
+  (go
+    (try
+      (info "take slope codes.")
+      (when-not (seq (<sub [:codes]))
+        (->> (data/get-slopes)
+             <!
+             (map :code)
+             (>evt-sync [:codes])))
+      (catch :default e
+        (error "take slope codes:" e)))))
 
-(def router
-  (reitit/router
-   [["/" :index]
-    ["/about" :about]]))
+(defn take-datas []
+  (when-not (<sub [:loading?])
+    (info "take-datas!!")
+    (go
+      (try
+        (>evt [:loading? true])
+        ;;(<! (take-codes))
+        (<! (take-slope-codes))
+        (doseq [code (<sub [:unloaded-codes])]
+          (->> (data/get-fund code)
+               <!
+               (>evt [:add-datas]))
+          ;; 通过timeout交出cpu执行，让ui正常刷新
+          (<! (async/timeout 200)))
+        (>evt [:datas-take-over])
+        (catch :default e
+          (error "take data:" e))
+        (finally
+          (>evt [:loading? false]))))))
 
-(defn path-for [route & [params]]
-  (if params
-    (:path (reitit/match-by-name router route params))
-    (:path (reitit/match-by-name router route))))
 
 ;; -------------------------
 ;; Page components
@@ -143,69 +182,11 @@
                                      :data managers
                                      }
                                     )}}]]]]))
-
-(def datas (atom []))
-(def have-data (atom true))
-(def codes (atom []))
-(def load-count (atom 0))
-(def batch-size 8)
-(def loading (atom false))
-
-(defn take-codes
-  []
-  (go
-    (try
-      (info "take-codes.")
-      (when-not (seq @codes)
-        (->> (data/get-all)
-             <!
-             (map :code)
-             (reset! codes)))
-      (catch :default e
-        (error "take-codes:" e)))))
-
-(defn take-slope-codes
-  []
-  (go
-    (try
-      (info "take slope codes.")
-      (when-not (seq @codes)
-        (->> (data/get-slopes)
-             <!
-             (map :code)
-             (reset! codes)))
-      (catch :default e
-        (error "take slope codes:" e)))))
-
-(defn take-datas []
-  (when-not @loading
-    (info "take-datas!!")
-    (go
-      (try
-        (reset! loading true)
-        ;;(<! (take-codes))
-        (<! (take-slope-codes))
-        (doseq [code (->> @codes
-                          (drop @load-count)
-                          (take batch-size))]
-          (->> (data/get-fund code)
-               <!
-               (swap! datas conj))
-          ;; 通过timeout交出cpu执行，让ui正常刷新
-          (<! (async/timeout 200)))
-        (swap! load-count #(+ batch-size %1))
-        (when (>= @load-count (count @codes))
-          (reset! have-data false))
-        (catch :default e
-          (error "take data:" e))
-        (finally
-          (reset! loading false))))))
-
 (defn home-page []
   (fn []
     [:div.columns.is-centered
      [:div.column.is-four-fifths
-      (for [d @datas]
+      (for [d (<sub [:datas])]
         ^{:key (:code d)}
         [:div
          [pingan-chart d]
@@ -213,10 +194,10 @@
 
       ;; 滚动加载
       [infinite-scroll
-       {:can-show-more? @have-data
+       {:can-show-more? (<sub [:have-data?])
         :load-fn take-datas}]
       [:button.button.is-fullwidth
-       {:class (when @loading
+       {:class (when (<sub [:loading?])
                  "is-loading")
         :on-click #(take-datas)}
        "加载更多"]
@@ -227,71 +208,54 @@
   (fn [] [:span.main
           [:h1 "About vtrade"]]))
 
-
-;; -------------------------
-;; Translate routes -> page components
-
-
-(defn page-for [route]
-  (case route
-    :index #'home-page
-    :about #'about-page))
-
-
 ;; -------------------------
 ;; Page mounting component
 
-
-(defn current-page []
+(defn current-page [main]
   (fn []
-    (let [page (:current-page (session/get :route))]
-      [:div
-       [:header
-        [:p [:a {:href (path-for :index)} "Home"] " | "
-         [:a {:href (path-for :about)} "About vtrade"]]]
-       [page]
-       [:footer
-        [:p "vtrade was generated by the "
-         [:a {:href "https://github.com/reagent-project/reagent-template"} "Reagent Template"] "."]]])))
+    [:div
+     [:header
+      [:p [:a {:href (k/path-for [:index])} "Home"] " | "
+       [:a {:href (k/path-for [:about])} "About vtrade"]]]
+     main
+     [:footer
+      [:p "vtrade was generated by the "
+       [:a {:href "https://github.com/reagent-project/reagent-template"} "Reagent Template"] "."]]]))
+
+;; -------------------------
+;; Routes
+
+(def routes
+  [["/" :index]
+   ["/about" :about]])
+
+;; dispatch
+(defn error-body [[err info]]
+  (js/console.log "An error occurred: " info)
+  (js/console.log "Context: " err)
+  [:div "Something went wrong"])
+
+(defn dispatch-main []
+  [error/boundary
+   error-body
+   [k/switch-route (comp :name :data)
+    :index [home-page]
+    :about [about-page]
+    nil [:div "Loading..."]]])
 
 ;; -------------------------
 ;; Initialize app
 
-(defn mount-root []
-  (rdom/render [current-page] (.getElementById js/document "app")))
-
-(comment
-  (go (->> (range 10)
-           (map #(go %1))
-           ;; 注意map返回的chan必须为closed,否则会挂起
-           async/merge
-           (async/reduce conj [])
-           <?maybe
-           (js/console.log "result:")))
-
-  (let [c1 (async/chan)
-        c2 (async/timeout 3000)]
-    (go (let [[value c] (async/alts! [c1 c2])]
-          (js/console.log "value:" value)
-          (when (= c c2)
-            (js/console.log "timouted!"))))
-    c1))
-
 (defn init []
-  (take-datas)
-  (clerk/initialize!)
-  (accountant/configure-navigation!
-   {:nav-handler
-    (fn [path]
-      (let [match (reitit/match-by-path router path)
-            current-page (:name (:data  match))
-            route-params (:path-params match)]
-        (reagent/after-render clerk/after-render!)
-        (session/put! :route {:current-page (page-for current-page)
-                              :route-params route-params})
-        (clerk/navigate-page! path)))
-    :path-exists?
-    (fn [path]
-      (boolean (reitit/match-by-path router path)))})
-  (accountant/dispatch-current!)
-  (mount-root))
+  (k/start! {:debug? true
+             :routes routes
+             :initial-db {:codes []
+                          :datas []
+                          :load-state {:have-data? true
+                                       :loading? false
+                                       :count 0
+                                       :batch-size 8
+                                       }}
+             :not-found "/"
+             :root-component [current-page [dispatch-main]]
+             }))
