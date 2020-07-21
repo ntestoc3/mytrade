@@ -133,13 +133,38 @@
                    "text" f"{name}<br/>任职时间[{work-range}]:共{days}, 增长率:{percent}"}))
            list)))
 
-(defn get-manager-info
+(defn find-contain-text
+  [info ele text]
+  (->> (.select info ele)
+       (filter #%(in text (. %1 text)))))
+
+(defn find-contain-text-one
+  [info ele text]
+  (-> (find-contain-text info ele text)
+      first))
+
+(defn get-info-value
+  [info head-text]
+  (-> (find-contain-text-one info "td" head-text)
+      (.  text )
+      (.split "：" )
+      second))
+
+(defn parse-fund-info
+  [data]
+  (setv infos (.select-one data "div.infoOfFund table"))
+  {"start-date" (get-info-value infos "成 立 日")
+   "scale" (get-info-value infos "基金规模")})
+
+(defn get-code-page-info
   [code]
-  (-> (requests.get f"http://fund.eastmoney.com/{code}.html")
-      (doto (setattr "encoding" "gbk2312"))
-      (. text)
-      (BeautifulSoup "lxml")
-      parse-manager-info))
+  (setv body (-> (requests.get f"http://fund.eastmoney.com/{code}.html")
+                 (doto (setattr "encoding" "gbk2312"))
+                 (. text)
+                 (BeautifulSoup "lxml")))
+  body
+  {#** (parse-fund-info body)
+   "managers" (parse-manager-info body)})
 
 (defn save-data
   [fname data]
@@ -156,9 +181,9 @@
              (.get info "fund_minsg"))
       (do
         (->> {#** fund
+              #** (get-code-page-info code)
               "Data_ACWorthTrend" (of info "Data_ACWorthTrend")
-              "Data_grandTotal" (get-fund-total-syl code)
-              "managers" (get-manager-info code)}
+              "Data_grandTotal" (get-fund-total-syl code)}
              (save-data f"{code}.json"))
         (logging.info "save-fund-info: %s, ok!" code)
         fund)
