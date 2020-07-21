@@ -178,15 +178,14 @@
   (logging.info "save-fund-info: %s" code)
   (setv info (get-fund-history-info code))
   (if (and info
-             (.get info "fund_minsg"))
-      (do
-        (->> {#** fund
-              #** (get-code-page-info code)
-              "Data_ACWorthTrend" (of info "Data_ACWorthTrend")
-              "Data_grandTotal" (get-fund-total-syl code)}
-             (save-data f"{code}.json"))
-        (logging.info "save-fund-info: %s, ok!" code)
-        fund)
+           (.get info "fund_minsg"))
+      (do (setv desc-info {#** fund
+                           #** (get-code-page-info code)})
+          (->> {#** desc-info
+                "Data_ACWorthTrend" (of info "Data_ACWorthTrend")
+                "Data_grandTotal" (get-fund-total-syl code)}
+               (save-data f"{code}.json"))
+          desc-info)
       (logging.info "save-fund-info: %s, skipped!" code)))
 
 (setv data-dir "datas/")
@@ -197,8 +196,7 @@
   (->2> (get-all-funds)
         (filter #%(-> (of %1 "type")
                       (in #{"股票型" "混合型"})))
-        ;; (pmap save-fund-info :proc 8) ;; 并发会被服务器拒绝连接
-        (map save-fund-info)
+        (pmap save-fund-info :proc 8) ;; 超过15分钟就会被断开连接
         (filter identity)
         list
         (save-data "all_funds.json")))
