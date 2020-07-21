@@ -12,30 +12,28 @@
 
 
 ;; 最大保存100条历史
-
-
 (defonce C (cache/localstore-cache :threshold 100))
 
-(defn- get-all-data-with-retry
-  []
-  (wa/pulling-retry {::wa/done? (comp not :failure)
-                     ::wa/retry-ms 30000
-                     ::wa/timeout 300000}
-                    (info "get all data...")
-                    (api/get-all-funds)))
-
-(defn- get-fund-info-with-retry
-  [code]
-  (wa/pulling-retry {::wa/done? (comp not :failure)
-                     ::wa/retry-ms 30000
-                     ::wa/timeout 300000}
-                    (info "get fund info:" code)
-                    (api/get-fund-info code)))
+(defn- with-retry
+  [tip f]
+  (fn []
+    (wa/pulling-retry {::wa/done? (comp not :failure)
+                       ::wa/retry-ms 30000
+                       ::wa/timeout 300000}
+                      (info "get " tip " data...")
+                      (f))))
 
 (defn get-all
   []
-  (cache/async-lookup-or-miss C :all get-all-data-with-retry))
+  (->> (with-retry "all" api/get-all-funds)
+       (cache/async-lookup-or-miss C :all)))
 
 (defn get-fund
   [code]
-  (cache/async-lookup-or-miss C code get-fund-info-with-retry))
+  (->> (with-retry code #(api/get-fund-info code))
+       (cache/async-lookup-or-miss C code)))
+
+(defn get-slopes
+  []
+  (->> (with-retry "slopes" api/get-code-slopes)
+       (cache/async-lookup-or-miss C :slopes)))

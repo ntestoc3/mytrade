@@ -164,13 +164,27 @@
       (catch :default e
         (error "take-codes:" e)))))
 
+(defn take-slope-codes
+  []
+  (go
+    (try
+      (info "take slope codes.")
+      (when-not (seq @codes)
+        (->> (data/get-slopes)
+             <!
+             (map :code)
+             (reset! codes)))
+      (catch :default e
+        (error "take slope codes:" e)))))
+
 (defn take-datas []
   (when-not @loading
     (info "take-datas!!")
     (go
       (try
         (reset! loading true)
-        (<! (take-codes))
+        ;;(<! (take-codes))
+        (<! (take-slope-codes))
         (doseq [code (->> @codes
                           (drop @load-count)
                           (take batch-size))]
