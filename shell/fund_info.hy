@@ -11,6 +11,7 @@
 (import logging)
 (import [datetime [datetime]])
 (import [ana [calc-poly]])
+(import [retry [retry]])
 
 ;; pip install bs4 requests lxml
 
@@ -198,25 +199,26 @@
                (open "w"))]
     (json.dump data f :ensure-ascii False :indent 4)))
 
-(defn save-fund-info
-  [fund]
-  (setv code (of fund "code"))
-  (logging.info "save-fund-info: %s" code)
-  (setv info (get-fund-history-info code))
-  (if (and info
-           (.get info "fund_minsg"))
-      (do
-        (setv ac-trend (of info "Data_ACWorthTrend"))
-        (setv desc-info {#** fund
-                         #** (get-code-page-info code)
-                         "slope" (some-> (calc-poly ac-trend)
-                                         first)})
-        (->> {#** desc-info
-              "Data_ACWorthTrend" ac-trend
-              "Data_grandTotal" (get-fund-total-syl code)}
-             (save-data f"{code}.json"))
-        desc-info)
-      (logging.info "save-fund-info: %s, skipped!" code)))
+(with-decorator (retry Exception :delay 1 :backoff 5 :max-delay 90)
+  (defn save-fund-info
+    [fund]
+    (setv code (of fund "code"))
+    (logging.info "save-fund-info: %s" code)
+    (setv info (get-fund-history-info code))
+    (if (and info
+             (.get info "fund_minsg"))
+        (do
+          (setv ac-trend (of info "Data_ACWorthTrend"))
+          (setv desc-info {#** fund
+                           #** (get-code-page-info code)
+                           "slope" (some-> (calc-poly ac-trend)
+                                           first)})
+          (->> {#** desc-info
+                "Data_ACWorthTrend" ac-trend
+                "Data_grandTotal" (get-fund-total-syl code)}
+               (save-data f"{code}.json"))
+          desc-info)
+        (logging.info "save-fund-info: %s, skipped!" code))))
 
 (setv data-dir "datas/")
 
@@ -225,8 +227,8 @@
   (os.makedirs data-dir :exist-ok True)
   (->2> (get-all-funds)
         (filter #%(-> (of %1 "type")
-                      (in #{"股票型" "混合型"})))
-        (pmap #%(with-exception (save-fund-info %1)) :proc 8) ;; 超过15分钟就会被断开连接
+                      (in #{"股票型" "混合型" "联接基金"})))
+        (pmap save-fund-info :proc 20) ;; 超过15分钟就会被断开连接
         (filter identity)
         list
         (save-data "all_funds.json")))
