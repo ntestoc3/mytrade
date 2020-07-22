@@ -47,16 +47,17 @@
       calc-poly
       first))
 
-(with [f (open "datas/slopes.json" "w")]
-  (-> (->> (glob.glob "datas/[0-9]*.json")
-           (map read-data)
-           (remove #%(-> (of %1 "Data_ACWorthTrend")
-                         len
-                         zero?))
-           (map (fn [info]
-                  {"code" (of info "code")
-                   "slope" (get-ac-worth-slope info)}))
-           (sorted :key #%(of %1 "slope"))
-           reversed
-           list)
-      (json.dump f)))
+(defmain [&rest args]
+  (with [f (open "datas/slopes.json" "w")]
+    (-> (->> (glob.glob "datas/[0-9]*.json")
+             (map read-data)
+             (remove #%(-> (of %1 "Data_ACWorthTrend")
+                           len
+                           zero?))
+             (map (fn [info]
+                    {"code" (of info "code")
+                     "slope" (get-ac-worth-slope info)}))
+             (sorted :key #%(of %1 "slope"))
+             reversed
+             list)
+        (json.dump f))))

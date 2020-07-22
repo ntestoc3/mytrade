@@ -10,6 +10,7 @@
 (import [multiprocessing.dummy [Pool]])
 (import logging)
 (import [datetime [datetime]])
+(import [ana [calc-poly]])
 
 ;; pip install bs4 requests lxml
 
@@ -22,6 +23,25 @@
                   `(~node ~ret))))
   ret)
 
+(defmacro some-> [head &rest args]
+  "Thread macro for first arg if not None"
+  (setv g (gensym "some->"))
+  (setv steps (->> args
+                   (map (fn [step]
+                          `(if (none? ~g)
+                               None
+                               (-> ~g ~step))))
+                   list))
+  (setv set-steps (map (fn [step]
+                         `(setv ~g ~step))
+                       (butlast steps)))
+  `(do (setv ~g ~head)
+       ~@set-steps
+       ~(if (empty? (list steps))
+            g
+            (last steps))))
+
+
 (defmacro bench [&rest body]
   (import time)
   (setv start-time (gensym "start-time"))
@@ -30,6 +50,12 @@
        ~@body
        (setv ~end-time (time.time))
        (print (.format "total run time: {:.5f} s" (- ~end-time ~start-time)))))
+
+(defmacro with-exception [&rest body]
+  `(try
+     ~@body
+     (except [e Exception]
+       (logging.error "exception: %s" e))))
 
 (defn select-keys
   [d ks]
@@ -170,7 +196,7 @@
   [fname data]
   (with [f (-> (os.path.join data-dir fname)
                (open "w"))]
-    (json.dump data f :ensure-ascii False)))
+    (json.dump data f :ensure-ascii False :indent 4)))
 
 (defn save-fund-info
   [fund]
@@ -179,13 +205,17 @@
   (setv info (get-fund-history-info code))
   (if (and info
            (.get info "fund_minsg"))
-      (do (setv desc-info {#** fund
-                           #** (get-code-page-info code)})
-          (->> {#** desc-info
-                "Data_ACWorthTrend" (of info "Data_ACWorthTrend")
-                "Data_grandTotal" (get-fund-total-syl code)}
-               (save-data f"{code}.json"))
-          desc-info)
+      (do
+        (setv ac-trend (of info "Data_ACWorthTrend"))
+        (setv desc-info {#** fund
+                         #** (get-code-page-info code)
+                         "slope" (some-> (calc-poly ac-trend)
+                                         first)})
+        (->> {#** desc-info
+              "Data_ACWorthTrend" ac-trend
+              "Data_grandTotal" (get-fund-total-syl code)}
+             (save-data f"{code}.json"))
+        desc-info)
       (logging.info "save-fund-info: %s, skipped!" code)))
 
 (setv data-dir "datas/")
@@ -196,7 +226,7 @@
   (->2> (get-all-funds)
         (filter #%(-> (of %1 "type")
                       (in #{"股票型" "混合型"})))
-        (pmap save-fund-info :proc 8) ;; 超过15分钟就会被断开连接
+        (pmap #%(with-exception (save-fund-info %1)) :proc 8) ;; 超过15分钟就会被断开连接
         (filter identity)
         list
         (save-data "all_funds.json")))
