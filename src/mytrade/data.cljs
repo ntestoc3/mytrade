@@ -32,8 +32,3 @@
   [code]
   (->> (with-retry code #(api/get-fund-info code))
        (cache/async-lookup-or-miss C code)))
-
-(defn get-slopes
-  []
-  (->> (with-retry "slopes" api/get-code-slopes)
-       (cache/async-lookup-or-miss C :slopes)))

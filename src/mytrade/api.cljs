@@ -24,4 +24,3 @@
 
 (def get-all-funds "获取所有基金代码" #(get-data "all_funds"))
 (def get-fund-info "获取指定基金代码的信息" get-data)
-(def get-code-slopes "获取所有基金的斜率" #(get-data "slopes"))

@@ -209,6 +209,7 @@
              :routes routes
              :initial-db {:codes []
                           :datas []
+                          :date-before (time/date-time 2019 01 01)
                           :load-state {:have-data? true
                                        :loading? false
                                        :count 0

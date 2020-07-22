@@ -1,6 +1,8 @@
 (ns mytrade.event
   (:require [kee-frame.core :as k :refer [reg-controller reg-chain reg-event-db reg-event-fx]]
             [re-frame.core :as rf]
+            [cljs-time.core :as time]
+            [cljs-time.format :as timef]
             [cljs.core.async :as async :refer [go <!]]
             [mytrade.data :as data]
             [mytrade.utils :as utils :refer [>evt <sub >evt-sync]]
@@ -14,6 +16,8 @@
 
 ;; 显示的基金数据
 (utils/sub-and-evt-db2 :datas [:datas])
+
+(utils/sub-and-evt-db2 :date-before [:date-before])
 
 ;;每次刷新数据大小
 (utils/sub-and-evt-db2 :batch-size [:load-state :batch-size])
@@ -45,6 +49,12 @@
 
 ;; ------------------------
 ;; Data helper
+
+(defn time-before?
+  [ts]
+  (-> (timef/parse {:format-str "yyyy-MM-dd"} ts)
+      (time/before? (<sub [:date-before]))))
+
 (defn take-codes
   []
   (go
@@ -53,25 +63,15 @@
       (when-not (seq (<sub [:codes]))
         (->> (data/get-all)
              <!
+             (filter #(not (identical? (:start-date %1) "--")))
+             (filter (comp time-before? :start-date))
+             (sort-by :slope)
+             reverse
              (map :code)
              (>evt-sync [:codes]))
         true)
       (catch :default e
         (error "take-codes:" e)))))
-
-(defn take-slope-codes
-  []
-  (go
-    (try
-      (info "take slope codes.")
-      (when-not (seq (<sub [:codes]))
-        (->> (data/get-slopes)
-             <!
-             (map :code)
-             (>evt-sync [:codes]))
-        true)
-      (catch :default e
-        (error "take slope codes:" e)))))
 
 (defn take-datas []
   (when-not (<sub [:loading?])
@@ -79,8 +79,7 @@
     (go
       (try
         (>evt [:loading? true])
-        ;;(<! (take-codes))
-        (<! (take-slope-codes))
+        (<! (take-codes))
         (info "take codes ok.")
         (doseq [code (<sub [:unloaded-codes])]
           (->> (data/get-fund code)
