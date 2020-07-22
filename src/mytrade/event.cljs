@@ -47,6 +47,28 @@
        (>= new-count codes-count) (assoc-in [:load-state :have-data?] false)
        :always (assoc-in [:load-state :count] new-count)))))
 
+(k/reg-event-db
+ :reset-codes
+ (fn [db _]
+   (assoc db
+          :codes []
+          :datas []
+          :load-state {:have-data? true
+                       :loading? false
+                       :count 0
+                       :batch-size 8
+                       })))
+
+(k/reg-event-fx
+ :set-date-before
+ (fn [{:keys [db]} [new-date]]
+   (info "set-date-before:" new-date)
+   (let [datef (timef/parse {:format-str "yyyy-MM-dd"} new-date)
+         new-db (assoc db :date-before datef)]
+     {:db new-db
+      :dispatch-n [[:reset-codes]
+                   [:take-datas]]})))
+
 ;; ------------------------
 ;; Data helper
 

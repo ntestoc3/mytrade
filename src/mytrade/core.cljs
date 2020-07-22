@@ -144,6 +144,19 @@
   (fn []
     [:div.columns.is-centered
      [:div.column.is-four-fifths
+
+      [:div.field.is-horizontal
+       [:div.field-label.is-normal
+        {:style {:flex-basis :unset}}
+        "设置基金最低成立时间:"]
+       [:div.field-body>div.field
+        [:input.input
+         {:type "date"
+          :value  (<sub [:date-before-str])
+          :on-change #(->> (oget %1 "target.value")
+                           (>evt [:set-date-before]))}]]]
+      [:br]
+
       (for [d (<sub [:datas])]
         ^{:key (:code d)}
         [:div
