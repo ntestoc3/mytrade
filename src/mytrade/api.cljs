@@ -8,7 +8,7 @@
                             logf tracef debugf infof warnf errorf fatalf reportf
                             spy get-env]]))
 
-(def api-server "http://www.clontr.club:6688/")
+(def api-server "http://localhost:6688")
 
 (defn- get-data
   [data-name]

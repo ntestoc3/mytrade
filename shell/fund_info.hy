@@ -15,6 +15,12 @@
 
 ;; pip install bs4 requests lxml
 
+(defmacro with-exception [&rest body]
+  `(try
+     ~@body
+     (except [e Exception]
+       (logging.exception "exception: %s" e))))
+
 (defmacro ->2> [head &rest args]
   "Thread macro for second arg"
   (setv ret head)
@@ -52,12 +58,6 @@
        (setv ~end-time (time.time))
        (print (.format "total run time: {:.5f} s" (- ~end-time ~start-time)))))
 
-(defmacro with-exception [&rest body]
-  `(try
-     ~@body
-     (except [e Exception]
-       (logging.error "exception: %s" e))))
-
 (defn select-keys
   [d ks]
   (->> (.items d)
@@ -90,18 +90,21 @@
 (defn get-all-funds
   []
   "获取所有基金条目"
-  (-> (requests.get "http://fund.eastmoney.com/js/fundcode_search.js"
-                    :headers common-headers)
-      (doto (setattr "encoding" "gbk2312"))
-      (. text)
-      (->> (re.search "(\[\[.*\]\])"))
-      (.group 0)
-      (.replace "," " ")
-      read-str
-      eval
-      (->> (map #%(->> %1
-                       (zip ["code" "short-name" "name" "type" "full-name"])
-                       dict)))))
+  (setv data (-> (requests.get "http://fund.eastmoney.com/js/fundcode_search.js"
+                               :headers common-headers)
+                 (doto (setattr "encoding" "gbk2312"))
+                 (. text)
+                 (->> (re.search "(\[\[.*\]\])"))
+                 (.group 0)
+                 (.replace "," " ")
+                 read-str
+                 eval
+                 (->> (map #%(->> %1
+                                  (zip ["code" "short-name" "name" "type" "full-name"])
+                                  dict)))
+                 list))
+  (logging.info "total: %d" (len data))
+  data)
 
 (defn get-fund-total-syl
   [code]
@@ -199,7 +202,7 @@
                (open "w"))]
     (json.dump data f :ensure-ascii False :indent 4)))
 
-(with-decorator (retry Exception :delay 1 :backoff 5 :max-delay 90)
+(with-decorator (retry Exception :tries 5 :delay 1 :backoff 5 :max-delay 90 :logger logging)
   (defn save-fund-info
     [fund]
     (setv code (of fund "code"))
@@ -211,8 +214,7 @@
           (setv ac-trend (of info "Data_ACWorthTrend"))
           (setv desc-info {#** fund
                            #** (get-code-page-info code)
-                           "slope" (some-> (calc-poly ac-trend)
-                                           first)})
+                           "slope" (calc-poly ac-trend)})
           (->> {#** desc-info
                 "Data_ACWorthTrend" ac-trend
                 "Data_grandTotal" (get-fund-total-syl code)}
@@ -222,22 +224,32 @@
 
 (setv data-dir "datas/")
 
+(defn check-save
+  [ntype]
+  (or (.startswith ntype "股票型")
+      (.startswith ntype "混合型")
+      (.startswith ntype "联接基金")))
+
 (defn save-all-info
   []
   (os.makedirs data-dir :exist-ok True)
   (->2> (get-all-funds)
         (filter #%(-> (of %1 "type")
-                      (in #{"股票型" "混合型" "联接基金"})))
-        (pmap save-fund-info :proc 20) ;; 超过15分钟就会被断开连接
+                      check-save))
+        (pmap #%(with-exception
+                  (save-fund-info %1)) :proc 20) ;; 超过15分钟就会被断开连接
         (filter identity)
         list
         (save-data "all_funds.json")))
 
 (defmain [&rest args]
   (logging.basicConfig :level logging.INFO
-                       :filename "app.log"
-                       :filemode "w"
+                       ;; :filename "app.log"
+                       ;; :filemode "w"
                        :style "{"
                        :format "{asctime} [{levelname}] {filename}({funcName})[{lineno}] {message}")
+  (setv logging.warning logging.exception)
+  (logging.warning "test")
+  (logging.info "start")
   (save-all-info)
   (logging.info "over!"))

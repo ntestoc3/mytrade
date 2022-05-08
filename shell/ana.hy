@@ -2,6 +2,7 @@
 (require [hy.extra.anaphoric [*]])
 (import [numpy :as np])
 ;; (import [matplotlib.pyplot :as plt])
+(import math)
 (import json)
 (import glob)
 (import [pathlib [Path]])
@@ -29,6 +30,36 @@
   (with [f (open fname)]
      (json.load f)))
 
+(defn calc-poly-xlv
+  [data]
+  (when (> (len data) 0)
+    (setv d (->> data
+                 (remove #%(none? (of %1 1)))
+                 list
+                 (np.array)))
+    (setv r (nget d ... 1))
+    (setv r-mean (np.mean r))
+    (setv r-var (np.var r))
+    (setv rv (np.mean (** (- r r-mean) 3)))
+    (if (math.isnan rv)
+        0
+        rv)))
+
+
+(defn calc-poly-poly
+  [data]
+  (when (> (len data) 0)
+    (setv d (->> data
+                 (remove #%(none? (of %1 1)))
+                 list
+                 (np.array)))
+    (setv r (first (np.polyfit (nget d ... 0)
+                        (nget d ... 1)
+                        1)))
+    (if (math.isnan r)
+        0
+        r)))
+
 (defn calc-poly
   [data]
   (when (> (len data) 0)
@@ -36,16 +67,24 @@
                  (remove #%(none? (of %1 1)))
                  list
                  (np.array)))
-    (np.polyfit (nget d ... 0)
-                (nget d ... 1)
-                1)))
+    (setv r (np.var (nget d ... 1) :ddof 1))
+    (if (math.isnan r)
+        0
+        r)))
+
+(defmacro with-exception [&rest body]
+  `(try
+     ~@body
+     (except [e Exception]
+       (logging.exception "exception: %s" e))))
 
 (defn get-ac-worth-slope
   [info]
   (print "get slope for:" (of info "code"))
-  (-> (of info "Data_ACWorthTrend")
-      calc-poly
-      first))
+  (or (with-exception
+        (-> (of info "Data_ACWorthTrend")
+            calc-poly))
+      0))
 
 (defmain [&rest args]
   (with [f (open "datas/slopes.json" "w")]
@@ -60,4 +99,4 @@
              (sorted :key #%(of %1 "slope"))
              reversed
              list)
-        (json.dump f))))
+        (json.dump f :indent 4))))

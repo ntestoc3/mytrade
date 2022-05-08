@@ -15,7 +15,7 @@
                 [org.clojars.mmb90/cljs-cache "0.1.4"]
                 ;; [datascript "0.18.13"]
                 [binaryage/oops "0.7.0"]
-                ;; [metosin/reitit "0.5.1"]
+                [metosin/reitit "0.5.1"]
                 ;; [venantius/accountant "0.2.5"
                 ;;  :exclusions [org.clojure/tools.reader]]
                 ;; [pez/clerk "1.0.0"]
